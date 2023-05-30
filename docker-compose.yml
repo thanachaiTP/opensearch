@@ -1,0 +1,76 @@
+version: '3.9'
+services:
+  opensearch-node: 
+    image: opensearchproject/opensearch:latest
+    container_name: opensearch-node
+    restart: always
+    environment:
+      - cluster.name=opensearch-cluster # Name the cluster
+      - node.name=opensearch-node # Name the node that will run in this container
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true # Disable JVM heap memory swapping
+      - "OPENSEARCH_JAVA_OPTS=-Xms1024m -Xmx1024m" # Set min and max JVM heap sizes to at least 50% of system RAM
+      - TZ=Asia/Bangkok
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - ./data:/usr/share/opensearch/data
+    ports:
+      - 9200:9200 # REST API
+      - 9600:9600 # Performance Analyzer
+
+  opensearch-dashboards:
+    depends_on:
+      - opensearch-node
+    image: opensearchproject/opensearch-dashboards:latest
+    container_name: opensearch-dashboards
+    restart: always
+    ports:
+      - 5601:5601
+    expose:
+      - "5601"
+    environment:
+      OPENSEARCH_HOSTS: '["https://opensearch-node:9200"]'
+      TZ: Asia/Bangkok
+
+  fluent-bit:
+    depends_on:
+      - opensearch-node
+    image: fluent/fluent-bit:latest
+    container_name: fluent-bit
+    restart: always
+    environment:
+      - TZ=Asia/Bangkok
+    volumes:
+      - ./conf/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      - ./fluent-data:/data/db
+    ports:
+      - 5044:5044
+
+  jaeger:
+    depends_on:
+      - opensearch-node
+    container_name: jaeger
+    image: jaegertracing/all-in-one:1.45
+    restart: always
+    environment:
+      - TZ=Asia/Bangkok
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=opensearch
+      - ES_TAGS_AS_FIELDS_ALL=true
+      - ES_USERNAME=admin
+      - ES_PASSWORD=admin
+      - ES_TLS_SKIP_HOST_VERIFY=true
+    ports:
+      - 9411:9411
+      - 16686:16686
+    command: [
+      "--es.server-urls=https://opensearch-node:9200",
+      "--es.tls.enabled=true",
+    ]

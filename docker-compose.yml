@@ -70,6 +70,7 @@ services:
     ports:
       - 9411:9411
       - 16686:16686
+      - 4318:4318
     command: [
       "--es.server-urls=https://opensearch-node:9200",
       "--es.tls.enabled=true",
